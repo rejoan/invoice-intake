@@ -1,996 +1,263 @@
-Automated Invoice Intake Pipeline
-
-1. Overview
-
-This project implements an automated Japanese invoice intake pipeline that processes PDF and image-based invoices, extracts structured invoice information using Google's Gemini multimodal AI, validates accounting rules locally, matches the supplier against a partner master, and registers the invoice with a local mock accounting system API.
-
-The pipeline deliberately separates:
-
-Document understanding
-
-Master-data matching
-
-Accounting validation
-
-API registration
-
-Manual-review handling
-
-The LLM is used for document understanding only. It is not trusted to perform financial calculations or make final accounting decisions.
-
-2. Project Structure
-
-invoice-intake/
-├── invoices/
-│   ├── invoice_01.pdf
-│   ├── invoice_04.jpg
-│   └── ...
-├── manual_review/
-├── logs/
-├── main.py
-├── extractor.py
-├── api_client.py
-├── matcher.py
-├── test_gemini.py
-├── requirements.txt
-├── .env
-├── .gitignore
-└── SUBMISSION.md
-
-3. Technology Stack
-
-Python 3.14
-
-Standard Python libraries
-
-requests
-
-python-dotenv
-
-pydantic
-
-Google GenAI Python SDK (google-genai)
-
-The implementation uses Google's current google-genai SDK rather than the older google-generativeai package.
-
-The local accounting API is:
-
-http://localhost:8080
-
-Authentication:
-
-X-API-Key: demo-key-1234
-
-4. High-Level Architecture
-
-invoices/ (PDF/JPG/PNG)
-        |
-        v
-Gemini Multimodal Document Extraction
-        |
-        v
-Structured Invoice JSON
-        |
-        +-------------------+
-        |                   |
-        v                   v
-Partner Matcher       Business Rules
-Name/Alias/Reg. No.   Tax/Amount/Date
-        |                   |
-        +---------+---------+
-                  |
-                  v
-          Validation Passed
-                  |
-                  v
-          POST /invoices
-                  |
-                  v
-        Registered Invoice
-
-Validation / Matching Failure
-                  |
-                  v
-           manual_review/
-
-5. API Pre-check
-
-Before invoice processing starts, the application loads master data.
-
-Partner Master
-
-GET /partners
-X-API-Key: demo-key-1234
-
-The partner master contains information such as:
-
-partner code
-
-supplier name
-
-registration number
-
-aliases
-
-Example:
-
-{
-  "partner_code": "P-1001",
-  "name": "株式会社サンプル",
-  "registration_number": "T1010001000101",
-  "aliases": [
-    "サンプル株式会社",
-    "株式会社サンプル商事"
-  ]
-}
-
-The partner master is loaded once per execution rather than once per invoice.
-
-Tax Code Master
-
-GET /tax-codes
-X-API-Key: demo-key-1234
-
-Expected supported tax codes:
-
-T10 = 10%
-T08 = 8%
-
-The application validates extracted tax codes against the current accounting-system master.
-
-6. Invoice Extraction
-
-Supported formats:
-
-.pdf
-.jpg
-.jpeg
-.png
-
-PDF invoices may contain digitally generated text or scanned pages. Image invoices are processed as multimodal image input.
-
-PDF documents are uploaded to Gemini and processed as document input.
-
-7. Gemini Model
-
-The model is configurable through .env:
-
-GEMINI_MODEL=gemini-3.7-flash
-
-The model is not hard-coded into business logic so it can be changed without modifying Python code.
-
-8. Gemini Prompt Strategy
-
-The extraction prompt instructs Gemini to:
-
-extract only information visible in the document
-
-avoid inventing missing values
-
-return null for unreadable fields
-
-preserve Japanese supplier names
-
-convert Japanese dates to Gregorian YYYY-MM-DD
-
-extract line-item amounts exactly
-
-return monetary amounts as integers
-
-identify invoice registration numbers
-
-identify T10/T08 tax codes
-
-inspect all pages of multi-page invoices
-
-The model is explicitly instructed:
-
-Do NOT calculate or repair subtotal, tax, or total.
-
-Financial calculations are performed independently by Python.
-
-9. Structured Output
-
-Expected structure:
-
-{
-  "supplier_name": "株式会社サンプル",
-  "tax_registration_number": "T1010001000101",
-  "invoice_number": "INV-2026-001",
-  "issue_date": "2026-08-01",
-  "due_date": "2026-08-31",
-  "line_items": [
-    {
-      "description": "商品A",
-      "quantity": 2,
-      "unit": "個",
-      "unit_price": 50000,
-      "amount": 100000,
-      "tax_code": "T10"
-    }
-  ],
-  "subtotal": 100000,
-  "tax_amount": 10000,
-  "total_amount": 110000
-}
-
-Gemini structured JSON output is used to reduce parsing ambiguity. The application additionally validates the returned structure.
-
-10. Supplier Matching
-
-Supplier matching is handled independently in matcher.py.
-
-Matching priority:
-
-Exact registration number
-
-Exact supplier name
-
-Exact alias
-
-Normalized Japanese name comparison
-
-Fuzzy matching
-
-The registration number is treated as the strongest identifier.
-
-Example:
-
-Extracted:
-株式会社サンプル
-
-Registration:
-T1010001000101
-
-Partner:
-P-1001
-
-The application resolves the partner code rather than asking the LLM to invent one.
-
-11. Why Matching Is Separate From the LLM
-
-Gemini extracts:
-
-supplier_name
-tax_registration_number
-
-The deterministic application layer determines:
-
-partner_code
-
-This prevents an LLM from incorrectly selecting or inventing an accounting partner.
-
-12. Business Validation
-
-Validation occurs before POST /invoices.
-
-Subtotal
-
-calculated_subtotal = sum(line_item.amount)
-
-Then:
-
-calculated_subtotal == invoice.subtotal
-
-If not, the invoice is rejected with:
-
-SUBTOTAL_MISMATCH
-
-Tax
-
-Tax is calculated independently:
-
-T10 = 10%
-T08 = 8%
-
-For each tax code:
-
-tax = floor(taxable_subtotal × rate)
-
-Example:
-
-T10 subtotal = 100,000
-T08 subtotal = 20,000
-
-T10 tax = floor(100,000 × 0.10) = 10,000
-T08 tax = floor(20,000 × 0.08) = 1,600
-
-Total tax = 11,600
-
-Total
-
-calculated_total = calculated_subtotal + calculated_tax
-
-Then:
-
-calculated_total == invoice.total_amount
-
-Otherwise:
-
-TOTAL_MISMATCH
-
-Dates
-
-The application verifies:
-
-due_date >= issue_date
-
-and validates YYYY-MM-DD.
-
-13. API Registration
-
-Only invoices that pass extraction, matching, and accounting validation are submitted.
-
-POST /invoices
-Content-Type: application/json
-X-API-Key: demo-key-1234
-
-Payload includes:
-
-partner code
-
-supplier name
-
-registration number
-
-invoice number
-
-issue date
-
-due date
-
-line items
-
-subtotal
-
-tax amount
-
-total amount
-
-14. API Error Handling
-
-Important expected errors include:
-
-HTTP 400
-
-Examples such as:
-
-AMOUNT_MISMATCH
-
-are logged and sent to manual review.
-
-HTTP 409
-
-DUPLICATE_INVOICE
-
-is treated as a business-level duplicate and is not blindly retried.
-
-HTTP 422
-
-PARTNER_NOT_FOUND
-
-is sent to manual review.
-
-15. Manual Review
-
-Invoices that cannot safely be processed automatically are written to:
-
-manual_review/
-
-Example:
-
-manual_review/invoice-001.json
-
-Example:
-
-{
-  "source_file": "invoices/invoice-001.pdf",
-  "reason": "VALIDATION_FAILED",
-  "extracted": {
-    "supplier_name": "株式会社サンプル",
-    "invoice_number": "INV-001",
-    "subtotal": 100000,
-    "tax_amount": 9000,
-    "total_amount": 109000
-  }
-}
-
-16. Logging
-
-Logs are written to:
-
-logs/invoice_intake.log
-
-The console also receives processing information.
-
-Important events include:
-
-master-data loading
-
-invoice extraction
-
-supplier match
-
-match confidence
-
-validation failures
-
-API responses
-
-successful registration
-
-manual-review decisions
-
-17. Dry-Run Mode
-
-Use:
-
-python main.py --dry-run
-
-This performs:
-
-Extraction
-    ↓
-Validation
-    ↓
-Partner Matching
-
-but does not call:
-
-POST /invoices
-
-This is useful for safely testing invoices.
-
-18. Normal Execution
-
-After configuration:
-
-python main.py
-
-The application scans:
-
-invoices/
-
-and processes all supported invoice files.
-
-19. Gemini Configuration
-
-.env:
-
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-3.7-flash
-
-ACCOUNTING_API_BASE_URL=http://localhost:8080
-ACCOUNTING_API_KEY=demo-key-1234
-
-INVOICE_DIR=invoices
-
-The Gemini API key must never be hard-coded into Python source code or committed to Git.
-
-20. Gemini API Test
-
-Run:
-
-python test_gemini.py
-
-Successful output:
-
-Gemini API is working.
-
-The Google GenAI SDK may emit a warning similar to:
-
-Direct use of automatic function calling (AFC) in Models.generate_content is not recommended...
-
-This is a warning, not an API failure. It means the SDK is advising that automatic function calling is normally used through a chat interface. This invoice pipeline does not require function/tool calling, so the warning has no functional impact on the extraction architecture.
-
-If desired, AFC can be explicitly disabled in the test call.
-
-21. Security Considerations
-
-The prototype uses:
-
-environment variables for API keys
-
-no hard-coded Gemini credentials
-
-accounting API authentication
-
-deterministic financial calculations
-
-partner master verification
-
-manual review for unsafe cases
-
-Production should additionally use:
-
-a secrets manager
-
-HTTPS
-
-API-key rotation
-
-access control
-
-encrypted invoice storage
-
-malware scanning
-
-PII retention policies
-
-audit logging
-
-22. Idempotency
-
-Duplicate invoices are a production concern.
-
-The mock API is expected to reject duplicates with:
-
-DUPLICATE_INVOICE
-
-A production implementation should also maintain an idempotency key based on a stable combination such as:
-
-partner_code + invoice_number
-
-or use a server-generated idempotency identifier.
-
-A persistent processing database should record:
-
-file hash
-
-invoice number
-
-partner code
-
-processing status
-
-timestamp
-
-API response
-
-23. Retry Strategy
-
-Transient infrastructure failures such as:
-
-HTTP 429
-HTTP 500
-HTTP 502
-HTTP 503
-HTTP 504
-connection timeout
-
-should be candidates for exponential backoff.
-
-Example:
-
-1 second
-2 seconds
-4 seconds
-8 seconds
-
-with a maximum retry count.
-
-Business errors such as:
-
-AMOUNT_MISMATCH
-DUPLICATE_INVOICE
-PARTNER_NOT_FOUND
-
-should not be blindly retried.
-
-24. Production Risks
-
-OCR / Vision Accuracy
-
-Japanese invoices may contain:
-
-small fonts
-
-low-resolution scans
-
-handwritten fields
-
-stamps
-
-complex tables
-
-Potential errors include:
-
-1,000,000 → 100,000
-8% → 10%
-2026/08/01 → 2026/06/01
-
-Mitigation:
-
-structured output
-
-deterministic validation
-
-registration-number matching
-
-manual review
-
-confidence thresholds
-
-original-document retention
-
-Japanese Date Conversion
-
-Japanese invoices can use:
-
-令和8年8月1日
-
-instead of:
-
-2026-08-01
-
-Gemini is instructed to convert Japanese era dates, but production should consider adding deterministic Japanese-era date parsing or a specialized document parser.
-
-Tax Rules
-
-This assignment specifies:
-
-T10 = 10%
-T08 = 8%
-
-with floor rounding.
-
-Real Japanese consumption-tax processing may be more complicated depending on invoice structure, tax category, rounding policy, taxable/non-taxable items, reduced tax rate, and accounting policy.
-
-The implementation follows the assignment rules rather than attempting to implement the entire Japanese tax system.
-
-Supplier Matching
-
-Fuzzy matching can be dangerous when suppliers have similar names.
-
-The registration number is therefore preferred over fuzzy supplier-name similarity.
-
-A production system should require a high-confidence match or human approval when multiple candidates are similar.
-
-LLM Hallucination
-
-Gemini could theoretically produce information not actually visible in the invoice.
-
-Mitigation:
-
-Explicit extraction prompt
-
-Structured output
-
-null for unavailable fields
-
-No financial calculations by the model
-
-Local reconciliation
-
-Partner master verification
-
-Manual review
-
-Duplicate Processing
-
-If the same file remains in the input directory, a later run could attempt to process it again.
-
-The accounting API's duplicate detection is a final safeguard. Production should also maintain persistent processing state.
-
-API Availability
-
-The local accounting API may become unavailable.
-
-Production should distinguish transient infrastructure failures from permanent business validation failures and retry transient failures automatically.
-
-25. Observability
-
-A production version should expose metrics such as:
-
-invoices_processed_total
-invoices_success_total
-invoices_manual_review_total
-extraction_failure_total
-validation_failure_total
-partner_match_failure_total
-duplicate_invoice_total
-api_failure_total
-average_processing_time
-average_llm_latency
-
-26. Cost Estimate
-
-The assignment assumes approximately:
-
-$0.01–$0.03 per invoice
-
-Actual cost depends on:
-
-Gemini model
-
-input token/document size
-
-number of pages
-
-image resolution
-
-output token count
-
-current API pricing
-
-The range is therefore an engineering estimate, not a guaranteed price.
-
-Representative Japanese invoices should be benchmarked before production deployment.
-
-27. Cost Optimization
-
-Potential optimizations:
-
-Use a lower-cost multimodal model for simple invoices.
-
-Escalate low-confidence invoices to a stronger model.
-
-Avoid repeated processing.
-
-Resize unnecessarily large images.
-
-Avoid sending irrelevant pages.
-
-Cache master data during a processing run.
-
-Keep the extraction schema compact.
-
-Limit output fields to required accounting information.
-
-A future two-stage architecture could be:
-
-Cheap Vision Model
-       ↓
-Confidence Check
-       ↓
-Low confidence?
-   /        \
- No          Yes
- |            |
-Submit    Stronger Model
-
-28. Why Python Owns the Accounting Logic
-
-The LLM is probabilistic while accounting calculations must be deterministic.
-
-Therefore:
-
-LLM:
-"What does the invoice say?"
-
-Python:
-"Does the invoice make accounting sense?"
-
-API:
-"Should this validated invoice be registered?"
-
-This separation is a core safety decision.
-
-29. 8-Hour Scope Trade-offs
-
-Included
-
-Gemini multimodal integration
-
-PDF/image support
-
-structured extraction
-
-schema validation
-
-partner matching
-
-registration-number matching
-
-fuzzy matching
-
-tax validation
-
-subtotal validation
-
-total validation
-
-date validation
-
-accounting API integration
-
-API error handling
-
-manual review output
-
-logging
-
-CLI
-
-dry-run mode
-
-environment configuration
-
-Deferred
-
-persistent processing database
-
-distributed job queue
-
-advanced confidence scoring
-
-human-review web interface
-
-document image preprocessing
-
-Japanese OCR fallback engine
-
-sophisticated Japanese-era date parser
-
-idempotency database
-
-automated retry queue
-
-monitoring dashboard
-
-distributed tracing
-
-secrets manager integration
-
-encrypted document storage
-
-comprehensive automated test suite
-
-multi-tenant support
-
-These are intentionally outside the core 8-hour assignment scope.
-
-30. Testing Strategy
-
-Case 1: Valid invoice
-
-Extraction → PASS
-Matching → PASS
-Validation → PASS
-POST → SUCCESS
-
-Case 2: Subtotal mismatch
-
-SUBTOTAL_MISMATCH
-→ manual review
-
-Case 3: Tax mismatch
-
-TAX_MISMATCH
-→ manual review
-
-Case 4: Total mismatch
-
-TOTAL_MISMATCH
-→ manual review
-
-Case 5: Invalid due date
-
-DATE_INVALID
-→ manual review
-
-Case 6: Unknown supplier
-
-PARTNER_NOT_FOUND_OR_AMBIGUOUS
-→ manual review
-
-Case 7: Duplicate invoice
-
-DUPLICATE_INVOICE
-→ no duplicate registration
-
-Case 8: API unavailable
-
-API connection failure
-→ error logged
-→ invoice not silently lost
-
-31. Recommended Test Sequence
-
-First verify Gemini:
-
-py test_gemini.py
-
-Then verify the accounting API:
-
-curl -H "X-API-Key: demo-key-1234" http://localhost:8080/partners
-
-Then perform a complete dry run:
-
-py main.py --dry-run
-
-Finally enable actual registration:
-
-py main.py
-
-32. Example Successful Workflow
-
-invoice_01.pdf
-       ↓
-Gemini extraction
-       ↓
-Supplier: 株式会社サンプル
-       ↓
-Registration: T1010001000101
-       ↓
-Partner: P-1001
-       ↓
-Subtotal: 100,000
-       ↓
-T10: 10,000
-       ↓
-Total: 110,000
-       ↓
-Validation PASS
-       ↓
-POST /invoices
-       ↓
-201 Created
-
-33. Example Failed Workflow
-
-invoice_02.jpg
-       ↓
-Gemini extraction
-       ↓
-Subtotal: 100,000
-       ↓
-Line item sum: 105,000
-       ↓
-SUBTOTAL_MISMATCH
-       ↓
-NO API POST
-       ↓
-manual_review/invoice-002.json
-
-34. Design Principles
-
-Fail closed
-
-If important information cannot be verified, do not register the invoice automatically.
-
-Deterministic financial logic
-
-Tax, subtotal, and total calculations are performed locally.
-
-Master-data driven
-
-Partner codes and tax codes come from the accounting API.
-
-AI-assisted, not AI-controlled
-
-Gemini extracts information but does not make final accounting decisions.
-
-Auditable
-
-Every failure has a reason and extracted data can be preserved for manual review.
-
-Configurable
-
-API URLs, API keys, invoice directory, and Gemini model are configured through environment variables.
-
-35. Final Assessment
-
-The implementation provides a practical foundation for automated Japanese invoice intake while maintaining a clear boundary between probabilistic document extraction and deterministic accounting logic.
-
-The strongest production-safety decision is that an invoice must pass local reconciliation before it reaches the accounting API.
-
-The current implementation is suitable as an approximately 8-hour engineering assignment and prototype.
-
-Recommended production priorities:
-
-Persistent idempotency and processing state
-
-Better Japanese document preprocessing
-
-Confidence-based human review
-
-Automated transient API retries
-
-Comprehensive automated tests
-
-Monitoring and alerting
-
-Security/privacy review for external AI processing
-
-Production-grade Japanese tax-rule validation
+# Submission
+
+- Name: Rejoanul Alam
+- Submission date (YYYY-MM-DD): 2026-08-22
+- Hours actually spent: 8
+- Repository / how to run it: https://github.com/rejoan/invoice-intake.
+  Start with `py accounting_api.py` (separate terminal — Windows; use
+  `python3 accounting_api.py` on macOS/Linux), then `py main.py`
+  (`python main.py` on macOS/Linux).
+
+## 1. Understanding the request
+
+The client's stated problem was narrow: accounting staff retype invoices by
+hand every month, it costs overtime at month-end close, and a typo nearly
+caused a duplicate payment.
+
+The problem I actually set out to solve is broader than "read invoices with
+AI": it's *safely* automating data entry without reproducing the exact
+failure mode the CEO described. An OCR/LLM pipeline that extracts numbers
+and posts them straight into the accounting system just replaces a human
+typo with a model hallucination — same risk, different source. So the real
+requirement is a pipeline that (a) extracts structured data from documents
+that vary in format (clean PDF text, scanned PDF, scanned images, some
+handwritten), (b) resolves the printed Japanese supplier name to the
+correct partner code in the existing accounting master, (c) independently
+verifies the extracted numbers add up before anything is registered, and
+(d) never silently posts something it isn't confident about — it routes
+that to a human instead. Trust in the numbers, not raw automation coverage,
+is the actual deliverable.
+
+## 2. What you would have asked the client
+
+| What you wanted to ask | The assumption you made | Why |
+|---|---|---|
+| Should one bad invoice block the whole month's batch, or be skipped and reported? | Skip and report individually; the batch keeps running | A single malformed invoice shouldn't hold up the other 11 during a real month-end close |
+| What counts as "confident enough" to auto-register vs. send to a human? | Any business-rule validation failure, unresolved/ambiguous partner match, or extraction the model itself flags as uncertain goes to manual review; everything else auto-registers | The CEO's own example was a near-duplicate payment — the design should be biased toward under-automating rather than over-automating |
+| How do invoices actually arrive in production (email attachment, scanned by staff, physical mail)? | Assumed a local folder drop, matching how the sample invoices were provided | No ingestion channel was specified, and building a channel-specific integration wasn't part of the assignment |
+| Is a fuzzy supplier-name match (no registration number, no exact name) ever acceptable to auto-post? | No — treated as manual review even if similarity score is high | Registration number is the one reliable identifier; a wrong supplier match means paying the wrong company |
+| Who reviews items sent to manual review, and how fast? | Assumed same-day review by accounting staff before close; no reviewer UI was built in the 8-hour budget, but the output format (JSON per invoice) is designed to be easy to act on | Building a full review UI wasn't feasible in scope, but the review handoff still needed to be usable, not just a log entry |
+| Is it acceptable to send invoice images/PDFs to a third-party LLM API, given this is a Japanese company's financial documents? | Assumed acceptable for this prototype/trial, since the assignment explicitly expects a third-party LLM key | Flagged as a real production concern in section 7 rather than silently ignored |
+
+## 3. Scoping decisions
+
+**What you built**
+
+- End-to-end pipeline: document ingestion (PDF text-layer, scanned PDF,
+  JPG/PNG) → Gemini multimodal extraction → schema-validated structured
+  JSON → independent partner matching → independent recalculation of
+  subtotal/tax/total → `POST /invoices` → structured error handling per API
+  error code → manual-review JSON output for anything that doesn't clear
+  every gate.
+- Supplier matching with an explicit priority order (registration number →
+  exact name → alias → normalized name → fuzzy), because financial
+  correctness shouldn't depend on the LLM's guess of a partner code.
+- A single-command startup and a `--dry-run` mode that runs extraction,
+  matching, and validation without touching the accounting API.
+- Structured logging of every stage for auditability.
+
+**What you left out, and why**
+
+- *Persistent processing database / idempotency store.* With 12 sample
+  invoices and an in-memory mock API, the accounting API's own
+  `DUPLICATE_INVOICE` check is sufficient for this exercise; a durable
+  store is a real production need but not required to demonstrate the
+  concept in 8 hours.
+- *Human review UI.* Writing reviewable JSON to `manual_review/` proves the
+  "don't auto-post what you're not sure of" gate exists without spending
+  several hours on a frontend that wasn't the point of the exercise.
+- *Confidence scoring beyond pass/fail.* Calibrated confidence thresholds
+  are their own research problem; I used binary validation gates
+  (schema valid / amounts reconcile / partner resolved) instead of a
+  continuous confidence score.
+- *Automated retry/backoff for transient failures.* I documented the
+  strategy (exponential backoff for 429/5xx, no retry for business errors)
+  but didn't implement a retry loop, since none of the 12 sample calls
+  needed it and it wasn't worth the time against higher-value items.
+- *Comprehensive automated test suite.* I validated behavior by running
+  all 12 sample invoices through the pipeline rather than writing unit
+  tests, given the time budget.
+- *Deterministic Japanese-era date parser.* I rely on the model to convert
+  era dates (e.g. 令和8年) to Gregorian and spot-checked the output rather
+  than building a dedicated parser.
+
+## 4. Design and technology choices
+
+**Flow:** `invoices/` (PDF/JPG/PNG) → Gemini multimodal extraction →
+structured invoice JSON → split into two independent checks (partner
+matcher against `/partners`; business-rule validator that recalculates
+subtotal/tax/total from the line items) → if both pass, `POST /invoices` →
+if either fails, or the API rejects it, write to `manual_review/`.
+
+**LLM/OCR choice:** Google Gemini via the `google-genai` SDK, chosen
+because it accepts PDFs and images natively as multimodal input in one
+call (no separate OCR step), handles Japanese text well, and has a usable
+free tier — relevant since the assignment requires bringing your own key.
+
+**What I decided against:**
+- *A separate OCR engine (Tesseract / a dedicated document-AI service) feeding
+  a text-only LLM.* A two-stage OCR-then-LLM pipeline adds a failure
+  surface (OCR errors compound into extraction errors) for no benefit here,
+  since a modern multimodal model reads the image directly. I do describe a
+  two-stage *cheap-model-then-expensive-model* architecture in section 7 as
+  a future cost optimization — that's a different axis (cost tiering, not
+  OCR-vs-multimodal).
+- *Letting the LLM choose the accounting `partner_code` directly.* The
+  model extracts what's printed (name, registration number); a
+  deterministic Python layer resolves that to a partner code. An LLM
+  should not be the thing deciding which ledger account gets debited.
+- *Letting the LLM perform or "repair" the arithmetic.* The prompt
+  explicitly forbids the model from calculating or fixing
+  subtotal/tax/total — Python recomputes everything independently, since
+  accounting math must be exact and auditable, not probabilistic.
+- *Building retry/queue infrastructure up front.* Correctness of the
+  validation gate was a better use of 8 hours than resilience
+  infrastructure for a 12-invoice batch.
+
+## 5. How you used AI, and how you checked it
+
+**What you delegated to AI**
+
+Document field extraction only: supplier name, tax registration number,
+invoice number, issue/due dates, line items (description, quantity, unit,
+unit price, amount, tax code), subtotal, tax amount, total amount. The
+prompt explicitly instructs the model to extract only what's visible,
+return `null` for unreadable fields, never invent values, and never
+calculate or repair totals.
+
+**How you verified the output**
+
+- Independent recomputation: subtotal = sum of line amounts, tax computed
+  per tax code on that code's subtotal with floor rounding, total =
+  subtotal + tax — computed in Python and compared against what Gemini
+  returned. Any mismatch blocks registration and routes to manual review.
+- Partner resolution is never taken from the model's raw text match; it's
+  resolved against the live `/partners` master by registration number
+  first, exact/alias name second.
+- Structural validation (types, required fields, date format) before
+  anything reaches the accounting API, so a malformed extraction fails
+  fast and visibly instead of being silently coerced.
+
+**A case where the AI got it wrong**
+
+`invoice_12.jpg`: Gemini extracted a negative value for line item 3's
+`amount`. That's not a value that should ever reach the accounting API —
+line amounts on a supplier invoice are non-negative — so local schema
+validation rejected it (`Line 3: amount cannot be negative`) before any
+API call was attempted, and the file was written to
+`manual_review/invoice_12.json`. I didn't try to "fix" the sign in code,
+since guessing whether it was a misread minus sign, a stray character on
+the scan, or something else on the source document is exactly the kind of
+silent correction this design is meant to avoid — a human needs to look at
+the original image.
+
+A second, more ambiguous case: `invoice_09.pdf` (the scanned-image-only
+PDF) failed on `TOTAL_MISMATCH` — the extracted total was ¥147,497, my
+locally recalculated total from the line items and tax was ¥147,496, a
+one-yen difference. I can't tell from the log alone whether that's a
+Gemini misread or a genuine rounding artifact on the source document
+itself (Japanese consumption-tax rounding can differ by document). Either
+way, the design doesn't try to guess which — a one-yen mismatch still
+fails the reconciliation check and goes to manual review rather than being
+silently accepted as "close enough."
+
+## 6. Integrating with the accounting system
+
+Actual results from a full run against all 12 sample invoices
+(`logs/invoice_intake.log`): 8 registered, 4 sent to manual review.
+
+| Invoice | Result | How you handled it |
+|---|---|---|
+| invoice_01.pdf | Registered — `ACC-0001` | Exact-name match to `P-1001`; validation passed; posted |
+| invoice_02.pdf | Registered — `ACC-0002` | Exact-name match to `P-1004`; 26-line invoice, largest in the set (¥1,560,988 total); extraction and validation both passed |
+| invoice_03.pdf | Registered — `ACC-0003` | Exact-name match to `P-1003`; posted |
+| invoice_04.jpg | Registered — `ACC-0004` | Exact-name match to `P-1002`; posted |
+| invoice_05.jpg | Registered — `ACC-0005` | Exact-name match to `P-1005`; posted |
+| invoice_06.jpg | Registered — `ACC-0006` | Exact-name match to `P-1001`; posted |
+| invoice_07.jpg | `409 DUPLICATE_INVOICE` → manual review | Matched partner `P-1001`, but the extracted invoice number (`YM-2026-0107`) collided with the number already registered from `invoice_01.pdf`. Not blindly retried — written to `manual_review/invoice_07.json` for a human to confirm whether it's a true duplicate or a misread invoice number |
+| invoice_08.jpg | Registered — `ACC-0007` | Exact-name match to `P-1003`; posted |
+| invoice_09.pdf | `TOTAL_MISMATCH` (off by ¥1) → manual review | Locally recalculated total (¥147,496) didn't match the extracted total (¥147,497). One-yen mismatches are rejected the same as any other — no tolerance band — and written to `manual_review/invoice_09.json` |
+| invoice_10.jpg | Partner match below threshold (score 0.364) → manual review | No exact, alias, or registration-number match found; fuzzy-match confidence too low to auto-post; written to `manual_review/invoice_10.json` rather than guessing the supplier |
+| invoice_11.jpg | Registered — `ACC-0008` | Exact-name match to `P-1002`; posted |
+| invoice_12.jpg | Schema validation failure (negative line amount) → manual review | Gemini returned a negative `amount` for line 3; rejected by local schema validation before any API call; written to `manual_review/invoice_12.json` |
+
+**Summary:** 8/12 registered automatically, 4/12 correctly stopped short of
+registration — one duplicate, one amount mismatch, one low-confidence
+partner match, one invalid extracted value. None of the 4 failures were
+silently forced through; each has a specific, logged reason and a
+preserved source reference for the reviewer.
+
+General handling, independent of any single invoice: `PARTNER_NOT_FOUND`,
+`UNKNOWN_TAX_CODE`, `DUE_DATE_BEFORE_ISSUE_DATE`, `AMOUNT_MISMATCH`, and
+`VALIDATION_ERROR` are all treated as business-level failures — logged and
+written to `manual_review/`, never retried automatically.
+`DUPLICATE_INVOICE` (409) is treated as an expected business signal, not an
+error to recover from — it means the invoice is already registered, so
+processing for that file stops without re-posting. `UNAUTHORIZED` and
+connection failures are treated as infrastructure failures, distinct from
+the above, and are the class of error that should be retried with backoff
+in production.
+
+## 7. Cost, limits, and risk in production
+
+- **Cost per invoice:** $0 in this test run — I used the Gemini free tier
+  for development, so I don't have real billed-cost numbers. Based on
+  `gemini-2.5-flash` published pricing and the size of these documents
+  (single-page invoices, one 26-line multi-page exception), a paid-tier
+  estimate is roughly $0.01–$0.03 per invoice, driven mainly by
+  input size (image/PDF resolution, page count) and output token count for
+  the structured JSON. This is an engineering estimate, not a measured
+  benchmark, and should be confirmed against actual billing before relying
+  on it.
+- **Monthly cost at 1,000 invoices per month:** Roughly $10–$30/month at
+  the above per-invoice estimate; compute/hosting cost is negligible at
+  this volume. Note this assumes moving off the free tier — the free
+  tier's request-per-minute/per-day quotas would likely be the first thing
+  hit at 1,000/month long before cost becomes the binding constraint.
+- **Processing time per invoice:** Measured from `logs/invoice_intake.log`
+  across all 12 invoices: 14–89 seconds each, averaging ~34 seconds
+  (12 invoices took 6 min 43 sec end to end on the free tier). The range
+  is wide — simple single-page invoices finished in 14–26s, while the
+  largest invoice (26 line items, `invoice_02.pdf`) and a couple of image
+  invoices took 40–89s. Free-tier rate limiting is the most likely cause
+  of the slower calls, so paid-tier latency would likely be both faster
+  and more consistent.
+- **Where this breaks first:** The pipeline is a single synchronous
+  process with no concurrency or queue. At ~34s/invoice average, 1,000
+  invoices/month is only ~9.5 hours of total processing time, so raw
+  throughput isn't the first wall — the free tier's rate limits are: the
+  test run above already showed call times varying 4x (14s to 89s) across
+  otherwise similar single-page invoices, consistent with throttling.
+  Moving to a paid tier and adding concurrency would remove that ceiling,
+  but the in-memory-style duplicate check and the flat-file
+  `manual_review/` output still wouldn't scale past a small batch — they'd
+  need a real database and a reviewer UI respectively before this could
+  run unattended at production volume.
+- **How you would find out if something was registered incorrectly:**
+  The accounting API already rejects internally inconsistent amounts
+  (it recalculates from line items), so most "obviously wrong" numbers
+  never get posted. The real risk is a value that's *wrong but internally
+  consistent* — e.g. a correctly-matched partner with a subtly misread
+  line amount that still balances. Production should run periodic
+  reconciliation (e.g. monthly total registered vs. supplier statement
+  totals), keep the source document linked to every registered record for
+  spot-checking, and log full extraction output alongside the API
+  response so any discrepancy can be traced back to what the model saw.
+
+## 8. What you would do with another 8 hours
+
+1. **A human review UI for `manual_review/`.** This is the highest-leverage
+   next step because it directly targets the CEO's stated pain (overtime,
+   error-prone manual entry) — right now, review means opening JSON files,
+   which doesn't actually save accounting staff time. A simple approve/
+   correct/reject screen would.
+2. **A persistent processing/idempotency store.** The in-memory duplicate
+   check in the mock API is fine for a demo but isn't a production
+   safety net; a real store (file hash, invoice number, partner code,
+   status, timestamp) is the next thing that matters once this runs
+   unattended every month.
+3. **Confidence-based two-tier extraction (cheap model → escalate on low
+   confidence).** This addresses both cost and reliability at scale, but
+   it's ordered last because it's an optimization on top of a pipeline
+   that already works — items 1 and 2 are correctness/usability gaps,
+   this is efficiency.
