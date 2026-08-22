@@ -1,0 +1,40 @@
+{
+  "source_file": "invoices\\invoice_12.jpg",
+  "reason": "VALIDATION_FAILED",
+  "extracted": {
+    "supplier_name": "みらいITソリューションズ株式会社",
+    "tax_registration_number": "T5050005000505",
+    "invoice_number": "MIT-2026-014",
+    "issue_date": "2026-02-10",
+    "due_date": "2026-03-31",
+    "line_items": [
+      {
+        "description": "業務システム改修",
+        "quantity": null,
+        "unit": "式",
+        "unit_price": null,
+        "amount": 450000,
+        "tax_code": "T10"
+      },
+      {
+        "description": "追加ライセンス",
+        "quantity": 5,
+        "unit": "本",
+        "unit_price": 24000,
+        "amount": 120000,
+        "tax_code": "T10"
+      },
+      {
+        "description": "値引き",
+        "quantity": null,
+        "unit": "式",
+        "unit_price": null,
+        "amount": -30000,
+        "tax_code": "T10"
+      }
+    ],
+    "subtotal": 540000,
+    "tax_amount": 54000,
+    "total_amount": 594000
+  }
+}

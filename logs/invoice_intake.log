@@ -1,0 +1,57 @@
+2026-08-22 13:25:24,460 | INFO | Loaded 5 partners
+2026-08-22 13:25:24,462 | INFO | Supported tax codes: ['T08', 'T10']
+2026-08-22 13:25:24,551 | INFO | Gemini model: gemini-2.5-flash
+2026-08-22 13:25:24,552 | INFO | Processing: invoice_01.pdf
+2026-08-22 13:25:25,851 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files "HTTP/1.1 200 OK"
+2026-08-22 13:25:28,016 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files?upload_id=AJjja9Yvnix83K7yWdYWsZG9o6l3pr82Bb1wwbfL2E6tu-Z9MibecdT2qkpAI5K4BspMGTUEMwaz-C590aaTH5-2TD2rRuzmkSnuyw5gCfYATw&upload_protocol=resumable "HTTP/1.1 200 OK"
+2026-08-22 13:25:40,676 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:25:40,697 | INFO | invoice_01.pdf: partner=P-1001 method=exact_name score=1.000
+2026-08-22 13:25:42,735 | INFO | invoice_01.pdf: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0001', 'partner_code': 'P-1001', 'invoice_number': 'YM-2026-0107', 'issue_date': '2026-01-07', 'due_date': '2026-02-28', 'subtotal': 304000, 'tax_amount': 30400, 'total_amount': 334400, 'line_count': 3}, 'error': None}
+2026-08-22 13:25:42,736 | INFO | Processing: invoice_02.pdf
+2026-08-22 13:25:43,380 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files "HTTP/1.1 200 OK"
+2026-08-22 13:25:45,385 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files?upload_id=AJjja9YmzaTp2HLWYQjFDmPcpXDWH2z2PtzfBn4BrRD-jM960bqTRt8scFCuO2IP-h7WqlkM1JDSOfoCNLPyZt_1BS89C_icLNMg23tfovNKvg&upload_protocol=resumable "HTTP/1.1 200 OK"
+2026-08-22 13:26:02,996 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:26:03,000 | INFO | invoice_02.pdf: partner=P-1004 method=exact_name score=1.000
+2026-08-22 13:26:05,080 | INFO | invoice_02.pdf: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0002', 'partner_code': 'P-1004', 'invoice_number': 'OSK-26-0112', 'issue_date': '2026-01-12', 'due_date': '2026-02-20', 'subtotal': 1419080, 'tax_amount': 141908, 'total_amount': 1560988, 'line_count': 26}, 'error': None}
+2026-08-22 13:26:05,081 | INFO | Processing: invoice_03.pdf
+2026-08-22 13:26:06,053 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files "HTTP/1.1 200 OK"
+2026-08-22 13:26:08,387 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files?upload_id=AJjja9bnXTsxFt7GVsm1vXM1WW6gy9495cI8nu_zQSwQGg4ET_KolcEaMv_TyxtCf9Z4B8212zT7hwAvsWj54ALZhBUUFn49-w4HHcTZHjqY0g&upload_protocol=resumable "HTTP/1.1 200 OK"
+2026-08-22 13:26:28,195 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:26:28,198 | INFO | invoice_03.pdf: partner=P-1003 method=exact_name score=1.000
+2026-08-22 13:26:30,253 | INFO | invoice_03.pdf: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0003', 'partner_code': 'P-1003', 'invoice_number': 'TF-2026-0115', 'issue_date': '2026-01-15', 'due_date': '2026-02-15', 'subtotal': 115340, 'tax_amount': 10017, 'total_amount': 125357, 'line_count': 4}, 'error': None}
+2026-08-22 13:26:30,254 | INFO | Processing: invoice_04.jpg
+2026-08-22 13:26:55,065 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:26:55,068 | INFO | invoice_04.jpg: partner=P-1002 method=exact_name score=1.000
+2026-08-22 13:26:57,135 | INFO | invoice_04.jpg: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0004', 'partner_code': 'P-1002', 'invoice_number': 'SATO-260118', 'issue_date': '2026-01-18', 'due_date': '2026-03-31', 'subtotal': 219000, 'tax_amount': 21900, 'total_amount': 240900, 'line_count': 2}, 'error': None}
+2026-08-22 13:26:57,136 | INFO | Processing: invoice_05.jpg
+2026-08-22 13:28:00,466 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:28:00,470 | INFO | invoice_05.jpg: partner=P-1005 method=exact_name score=1.000
+2026-08-22 13:28:02,546 | INFO | invoice_05.jpg: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0005', 'partner_code': 'P-1005', 'invoice_number': 'MIT-2026-011', 'issue_date': '2026-01-20', 'due_date': '2026-02-28', 'subtotal': 397000, 'tax_amount': 39700, 'total_amount': 436700, 'line_count': 3}, 'error': None}
+2026-08-22 13:28:02,546 | INFO | Processing: invoice_06.jpg
+2026-08-22 13:28:40,978 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:28:40,981 | INFO | invoice_06.jpg: partner=P-1001 method=exact_name score=1.000
+2026-08-22 13:28:43,037 | INFO | invoice_06.jpg: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0006', 'partner_code': 'P-1001', 'invoice_number': 'YM-2026-0122', 'issue_date': '2026-01-22', 'due_date': '2026-02-28', 'subtotal': 93000, 'tax_amount': 9300, 'total_amount': 102300, 'line_count': 2}, 'error': None}
+2026-08-22 13:28:43,038 | INFO | Processing: invoice_07.jpg
+2026-08-22 13:29:26,641 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:29:26,645 | INFO | invoice_07.jpg: partner=P-1001 method=exact_name score=1.000
+2026-08-22 13:29:28,707 | ERROR | invoice_07.jpg: API error HTTP=409 code=DUPLICATE_INVOICE body={'success': False, 'data': None, 'error': {'code': 'DUPLICATE_INVOICE', 'message': 'This invoice number is already registered for this partner', 'details': {'partner_code': 'P-1001', 'invoice_number': 'YM-2026-0107'}}}
+2026-08-22 13:29:28,714 | INFO | Processing: invoice_08.jpg
+2026-08-22 13:30:55,515 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:30:55,518 | INFO | invoice_08.jpg: partner=P-1003 method=exact_name score=1.000
+2026-08-22 13:30:57,558 | INFO | invoice_08.jpg: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0007', 'partner_code': 'P-1003', 'invoice_number': 'TF-2026-0125', 'issue_date': '2026-01-25', 'due_date': '2026-02-25', 'subtotal': 110000, 'tax_amount': 8936, 'total_amount': 118936, 'line_count': 2}, 'error': None}
+2026-08-22 13:30:57,558 | INFO | Processing: invoice_09.pdf
+2026-08-22 13:30:58,384 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files "HTTP/1.1 200 OK"
+2026-08-22 13:31:00,774 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/upload/v1beta/files?upload_id=AJjja9Z5d6GkluJ2dKuTs1ZrJtmsVW7Pf7GwsWNnDVoxgMM_tA__QHEF8UBG7eNW8RWqosSux-Ec4CsNs5FTEqRigv-e3o3Yy0cevqs0UWGEQw&upload_protocol=resumable "HTTP/1.1 200 OK"
+2026-08-22 13:31:18,986 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:31:18,989 | ERROR | invoice_09.pdf: TOTAL_MISMATCH: invoice=147497, calculated=147496
+2026-08-22 13:31:18,992 | INFO | Processing: invoice_10.jpg
+2026-08-22 13:31:32,938 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:31:32,942 | ERROR | invoice_10.jpg: partner matching failed method=below_threshold score=0.364
+2026-08-22 13:31:32,945 | INFO | Processing: invoice_11.jpg
+2026-08-22 13:31:50,898 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:31:50,902 | INFO | invoice_11.jpg: partner=P-1002 method=exact_name score=1.000
+2026-08-22 13:31:52,950 | INFO | invoice_11.jpg: registered successfully: {'success': True, 'data': {'accounting_id': 'ACC-0008', 'partner_code': 'P-1002', 'invoice_number': 'SATO-260205', 'issue_date': '2026-02-05', 'due_date': '2026-03-31', 'subtotal': 113700, 'tax_amount': 11370, 'total_amount': 125070, 'line_count': 2}, 'error': None}
+2026-08-22 13:31:52,950 | INFO | Processing: invoice_12.jpg
+2026-08-22 13:32:07,386 | INFO | HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-08-22 13:32:07,395 | ERROR | invoice_12.jpg: Line 3: amount cannot be negative
+2026-08-22 13:32:07,397 | INFO | Finished: total=12 success=8 manual_review=4

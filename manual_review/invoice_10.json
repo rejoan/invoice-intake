@@ -1,0 +1,32 @@
+{
+  "source_file": "invoices\\invoice_10.jpg",
+  "reason": "PARTNER_NOT_FOUND_OR_AMBIGUOUS: method=below_threshold, score=0.364",
+  "extracted": {
+    "supplier_name": "新星ロジスティクス株式会社",
+    "tax_registration_number": "T9090009000909",
+    "invoice_number": "SSL-2026-0203",
+    "issue_date": "2026-02-03",
+    "due_date": "2026-03-31",
+    "line_items": [
+      {
+        "description": "倉庫保管料 (1月分)",
+        "quantity": null,
+        "unit": "式",
+        "unit_price": null,
+        "amount": 120000,
+        "tax_code": "T10"
+      },
+      {
+        "description": "入出庫作業",
+        "quantity": 340,
+        "unit": "件",
+        "unit_price": 220,
+        "amount": 74800,
+        "tax_code": "T10"
+      }
+    ],
+    "subtotal": 194800,
+    "tax_amount": 19480,
+    "total_amount": 214280
+  }
+}

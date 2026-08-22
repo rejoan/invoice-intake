@@ -1,0 +1,40 @@
+{
+  "source_file": "invoices\\invoice_07.jpg",
+  "reason": "API_REGISTRATION_FAILED: HTTP=409, code=DUPLICATE_INVOICE",
+  "extracted": {
+    "supplier_name": "株式会社山田製作所",
+    "tax_registration_number": "T1010001000101",
+    "invoice_number": "YM-2026-0107",
+    "issue_date": "2026-01-07",
+    "due_date": "2026-02-28",
+    "line_items": [
+      {
+        "description": "精密部品A-100",
+        "quantity": 120,
+        "unit": "個",
+        "unit_price": 1250,
+        "amount": 150000,
+        "tax_code": "T10"
+      },
+      {
+        "description": "精密部品B-220",
+        "quantity": 40,
+        "unit": "個",
+        "unit_price": 3400,
+        "amount": 136000,
+        "tax_code": "T10"
+      },
+      {
+        "description": "梱包・輸送費",
+        "quantity": null,
+        "unit": "式",
+        "unit_price": null,
+        "amount": 18000,
+        "tax_code": "T10"
+      }
+    ],
+    "subtotal": 304000,
+    "tax_amount": 30400,
+    "total_amount": 334400
+  }
+}
