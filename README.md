@@ -60,7 +60,6 @@ invoice-intake/
 ├── extractor.py
 ├── api_client.py
 ├── matcher.py
-├── test_gemini.py
 ├── requirements.txt
 ├── .env
 ├── .gitignore
@@ -153,7 +152,7 @@ image input.
 Configurable via `.env`:
 
 ```
-GEMINI_MODEL=gemini-3.7-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 Kept out of business logic so it can be swapped without code changes.
@@ -323,7 +322,7 @@ Scans `invoices/` and processes every supported file.
 
 ```
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-3.7-flash
+GEMINI_MODEL=gemini-2.5-flash
 
 ACCOUNTING_API_BASE_URL=http://localhost:8080
 ACCOUNTING_API_KEY=demo-key-1234
@@ -333,22 +332,7 @@ INVOICE_DIR=invoices
 
 The Gemini API key must never be hard-coded or committed to Git.
 
-## 20. Gemini API smoke test
-
-```bash
-py test_gemini.py          # Windows
-python test_gemini.py      # macOS/Linux
-```
-
-Expected output: `Gemini API is working.`
-
-The SDK may emit a warning like *"Direct use of automatic function
-calling (AFC) in Models.generate_content is not recommended..."* — this is
-informational, not a failure. This pipeline doesn't use tool/function
-calling, so it has no functional impact; it can be silenced by explicitly
-disabling AFC in the call if desired.
-
-## 21. Security considerations
+## 20. Security considerations
 
 **In this prototype:**
 - API keys via environment variables, never hard-coded
@@ -368,7 +352,7 @@ disabling AFC in the call if desired.
 - a data-processing review for sending financial documents to a
   third-party LLM API
 
-## 22. Idempotency
+## 21. Idempotency
 
 The mock API rejects duplicates with `409 DUPLICATE_INVOICE`, keyed on
 `partner_code + invoice_number`. That's a sufficient backstop for this
@@ -377,7 +361,7 @@ record (file hash, invoice number, partner code, processing status,
 timestamp, API response) so a duplicate is caught *before* an LLM call is
 even made, not just before registration.
 
-## 23. Retry strategy
+## 22. Retry strategy
 
 **Retry with exponential backoff** (transient/infrastructure failures):
 `429`, `500`, `502`, `503`, `504`, connection timeout — e.g. 1s, 2s, 4s,
@@ -390,7 +374,7 @@ outcome): `AMOUNT_MISMATCH`, `DUPLICATE_INVOICE`, `PARTNER_NOT_FOUND`,
 (Not yet implemented in this prototype — documented here as the intended
 production behavior; see `SUBMISSION.md` section 3 for why it was cut.)
 
-## 24. Production risks
+## 23. Production risks
 
 **OCR/vision accuracy.** Japanese invoices can have small fonts,
 low-resolution scans, handwritten fields, stamps, and complex tables.
@@ -429,7 +413,7 @@ state so duplicates are caught before an LLM call is spent on them.
 infrastructure failures from permanent business-validation failures and
 retry only the former.
 
-## 25. Observability (production target)
+## 24. Observability (production target)
 
 ```
 invoices_processed_total
@@ -444,7 +428,7 @@ average_processing_time
 average_llm_latency
 ```
 
-## 26. Cost estimate
+## 25. Cost estimate
 
 Roughly $0.01–$0.03 per invoice, driven by Gemini model choice, input
 document size/resolution, page count, and output token count. This is an
@@ -452,7 +436,7 @@ engineering estimate based on assignment-scale usage, not a benchmark —
 representative invoices should be measured before any production
 deployment. See `SUBMISSION.md` section 7 for the monthly projection.
 
-## 27. Cost optimization (future work)
+## 26. Cost optimization (future work)
 
 - Use a lower-cost multimodal model for straightforward invoices; escalate
   low-confidence extractions to a stronger model
@@ -474,7 +458,7 @@ Low confidence?
 Submit    Stronger Model
 ```
 
-## 28. Why Python owns the accounting logic
+## 27. Why Python owns the accounting logic
 
 The LLM is probabilistic; accounting calculations must be deterministic.
 
@@ -484,7 +468,7 @@ The LLM is probabilistic; accounting calculations must be deterministic.
 
 This separation is the core safety decision behind the design.
 
-## 29. Design principles
+## 28. Design principles
 
 - **Fail closed** — if something can't be verified, don't auto-register it.
 - **Deterministic financial logic** — tax/subtotal/total computed locally.
@@ -496,7 +480,7 @@ This separation is the core safety decision behind the design.
 - **Configurable** — API URLs, keys, invoice directory, and model are all
   environment-driven.
 
-## 30. Final assessment
+## 29. Final assessment
 
 The strongest production-safety decision in this design is that an
 invoice must pass local reconciliation before it ever reaches the
